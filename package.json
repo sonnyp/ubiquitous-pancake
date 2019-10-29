@@ -1,0 +1,23 @@
+{
+  "name": "ubiquitous-pancake",
+  "version": "0.0.0",
+  "scripts": {
+    "test": "ava && eslint ."
+  },
+  "description": "",
+  "homepage": "https://github.com/sonnyp/ubiquitous-pancake",
+  "bugs": "https://github.com/sonnyp/ubiquitous-pancake/issues",
+  "license": "ISC",
+  "author": "Sonny Piers <sonny@fastmail.net>",
+  "repository": "github:sonnyp/ubiquitous-pancake",
+  "devDependencies": {
+    "ava": "^2.4.0",
+    "eslint": "^6.6.0",
+    "node-fetch": "^2.6.0",
+    "prettier": "^1.18.2"
+  },
+  "dependencies": {
+    "crc32-stream": "^3.0.1",
+    "uuid": "^3.3.3"
+  }
+}
