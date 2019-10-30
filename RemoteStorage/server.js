@@ -52,7 +52,12 @@ function shouldAuthorize(req, path) {
   return true;
 }
 
-function createRemoteStorageRequestHandler({ storage, prefix, authorize }) {
+function createRemoteStorageRequestHandler({
+  storage,
+  prefix,
+  authorize,
+  readOnly = false,
+}) {
   return async function remoteStorageRequestHandler(req, res) {
     res.setHeader("Access-Control-Allow-Origin", "*");
 
@@ -99,7 +104,9 @@ function createRemoteStorageRequestHandler({ storage, prefix, authorize }) {
         }
         break;
       case "PUT":
-        if (path.endsWith("/")) {
+        if (readOnly) {
+          res.statusCode = 405;
+        } else if (path.endsWith("/")) {
           res.statusCode = 405;
         } else {
           res.setHeader("Access-Control-Expose-Headers", "ETag");
@@ -107,6 +114,9 @@ function createRemoteStorageRequestHandler({ storage, prefix, authorize }) {
         }
         break;
       case "DELETE":
+        if (readOnly) {
+          res.statusCode = 405;
+        }
         if (path.endsWith("/")) {
           res.statusCode = 405;
         } else {

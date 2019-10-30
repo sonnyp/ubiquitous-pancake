@@ -147,6 +147,19 @@ test("PUT file", async t => {
   t.is(res.headers.get("Access-Control-Expose-Headers"), "ETag");
 });
 
+test("PUT file - readOnly", async t => {
+  const res = await fetch(
+    createRemoteStorageRequestHandler({
+      storage: new MockStorage(),
+      authorize: mockAuthorize,
+      readOnly: true,
+    }),
+    "/foo",
+    { method: "PUT" }
+  );
+  t.is(res.status, 405);
+});
+
 test("DELETE folder", async t => {
   const res = await fetch(
     createRemoteStorageRequestHandler({
@@ -171,6 +184,19 @@ test("DELETE file", async t => {
     { method: "DELETE" }
   );
   t.is(res.headers.get("Access-Control-Expose-Headers"), "ETag");
+});
+
+test("DELETE file - readOnly", async t => {
+  const res = await fetch(
+    createRemoteStorageRequestHandler({
+      storage: new MockStorage(),
+      authorize: mockAuthorize,
+      readOnly: true,
+    }),
+    "/foo",
+    { method: "DELETE" }
+  );
+  t.is(res.status, 405);
 });
 
 test("HEAD folder", async t => {

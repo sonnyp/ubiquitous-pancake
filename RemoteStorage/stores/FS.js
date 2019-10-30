@@ -51,8 +51,6 @@ class FS extends Storage {
     const dirents = (await readdir(this.resolve(path), {
       withFileTypes: true,
     })).filter(dirent => {
-      console.log(dirent.name);
-      console.log(dirent.name.startswith);
       if (!this.hidden && dirent.name.startsWith(".")) return false;
       return dirent.isDirectory() || dirent.isFile();
     });
