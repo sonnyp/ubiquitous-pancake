@@ -56,7 +56,7 @@ function createRemoteStorageRequestHandler({
   storage,
   prefix,
   authorize,
-  readOnly = false,
+  mode = "rw",
 }) {
   return async function remoteStorageRequestHandler(req, res) {
     res.setHeader("Access-Control-Allow-Origin", "*");
@@ -100,11 +100,15 @@ function createRemoteStorageRequestHandler({
         if (path.endsWith("/")) {
           await storage.getFolder(path, req, res);
         } else {
-          await storage.getFile(path, req, res);
+          if (mode === "wo") {
+            res.statusCode = 405;
+          } else {
+            await storage.getFile(path, req, res);
+          }
         }
         break;
       case "PUT":
-        if (readOnly) {
+        if (mode === "ro") {
           res.statusCode = 405;
         } else if (path.endsWith("/")) {
           res.statusCode = 405;
@@ -114,10 +118,9 @@ function createRemoteStorageRequestHandler({
         }
         break;
       case "DELETE":
-        if (readOnly) {
+        if (mode !== "rw") {
           res.statusCode = 405;
-        }
-        if (path.endsWith("/")) {
+        } else if (path.endsWith("/")) {
           res.statusCode = 405;
         } else {
           res.setHeader("Access-Control-Expose-Headers", "ETag");

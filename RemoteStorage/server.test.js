@@ -147,12 +147,12 @@ test("PUT file", async t => {
   t.is(res.headers.get("Access-Control-Expose-Headers"), "ETag");
 });
 
-test("PUT file - readOnly", async t => {
+test("PUT file - mode=ro", async t => {
   const res = await fetch(
     createRemoteStorageRequestHandler({
       storage: new MockStorage(),
       authorize: mockAuthorize,
-      readOnly: true,
+      mode: "ro",
     }),
     "/foo",
     { method: "PUT" }
@@ -186,12 +186,12 @@ test("DELETE file", async t => {
   t.is(res.headers.get("Access-Control-Expose-Headers"), "ETag");
 });
 
-test("DELETE file - readOnly", async t => {
+test("DELETE file - ro", async t => {
   const res = await fetch(
     createRemoteStorageRequestHandler({
       storage: new MockStorage(),
       authorize: mockAuthorize,
-      readOnly: true,
+      mode: "ro",
     }),
     "/foo",
     { method: "DELETE" }

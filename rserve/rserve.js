@@ -14,14 +14,15 @@ const argv = minimist(process.argv.slice(2));
 
 const port = argv.port || 8181;
 const host = argv.host;
+const mode = argv.mode || "rw";
 const url = new URL(argv.url || `http://localhost:${port}/`);
-// const url = new URL(`${protocol}://${domain}:${port}/`);
 
 const root = argv._[0] ? resolve(argv._[0]) : process.cwd();
 
 const storage = new FS({
   root,
   hidden: false,
+  mode,
 });
 const remoteStorage = RemoteStorage({
   storage,
@@ -66,6 +67,6 @@ const server = createServer((req, res) => {
   await storage.load();
 
   server.listen(port, host, () => {
-    console.log(`Serving ${root} at ${url}`);
+    console.log(`Serving ${root} in mode ${mode} at ${url}`);
   });
 })().catch(console.error);
