@@ -35,6 +35,7 @@ class FlatFS extends Storage {
     } catch (err) {
       if (err.code !== "ENOENT") throw err;
       this.tree = createTree();
+      await this.setTree();
       return;
     }
 
@@ -46,7 +47,7 @@ class FlatFS extends Storage {
   }
 
   async unload() {
-    return this._save();
+    return this.setTree();
   }
 
   async getTree() {

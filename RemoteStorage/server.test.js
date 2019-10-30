@@ -1,3 +1,5 @@
+const { createServer } = require("http");
+
 const test = require("ava");
 
 const { createRemoteStorageRequestHandler } = require("./server");
@@ -6,7 +8,7 @@ const Storage = require("./Storage");
 
 class MockStorage extends Storage {}
 
-async function fetch(app, path, options) {
+async function fetch(app, path, options = {}) {
   if (!options.headers) {
     options.headers = {};
   }
@@ -22,68 +24,67 @@ async function mockAuthorize(token, path) {
   return true;
 }
 
-// const { createServer } = require("http");
-// describe("createRemoteStorageRequestHandler", () => {
-//   test("responds with 401 if Auhtorization header is missing", async () => {
-//     const res = await superfetch(
-//       createRemoteStorageRequestHandler({
-//         storage: new MockStorage(),
-//         authorize: mockAuthorize,
-//       }),
-//       "/"
-//     );
-//     expect(res.status).toBe(401);
-//   });
+test("responds with 401 if Auhtorization header is missing", async t => {
+  const res = await superfetch(
+    createRemoteStorageRequestHandler({
+      storage: new MockStorage(),
+      authorize: mockAuthorize,
+    }),
+    "/"
+  );
+  t.is(res.status, 401);
+});
 
-//   test("responds with 401 if Auhtorization header is invalid", async () => {
-//     const res = await superfetch(
-//       createRemoteStorageRequestHandler({
-//         storage: new MockStorage(),
-//         authorize: mockAuthorize,
-//       }),
-//       "/",
-//       {
-//         headers: {
-//           Authorization: "foo",
-//         },
-//       }
-//     );
-//     expect(res.status).toBe(401);
-//   });
+test("responds with 401 if Auhtorization header is invalid", async t => {
+  const res = await superfetch(
+    createRemoteStorageRequestHandler({
+      storage: new MockStorage(),
+      authorize: mockAuthorize,
+    }),
+    "/",
+    {
+      headers: {
+        Authorization: "foo",
+      },
+    }
+  );
+  t.is(res.status, 401);
+});
 
-//   test("sends Access-Control-Allow-Origin response header set to *", async () => {
-//     const res = await fetch(
-//       createRemoteStorageRequestHandler({
-//         storage: new MockStorage(),
-//         authorize: mockAuthorize,
-//       }),
-//       "/"
-//     );
-//     expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
-//   });
+test("sets Access-Control-Allow-Origin response header set to *", async t => {
+  const res = await fetch(
+    createRemoteStorageRequestHandler({
+      storage: new MockStorage(),
+      authorize: mockAuthorize,
+    }),
+    "/"
+  );
+  t.is(res.headers.get("Access-Control-Allow-Origin"), "*");
+});
 
-//   test("rejects if an operation throws or rejects", cb => {
-//     const storage = new MockStorage();
-//     const error = new Error("foobar");
+test.cb("rejects if an operation throws or rejects", t => {
+  t.plan(2);
 
-//     storage.deleteDocument = jest.fn().mockRejectedValue(error);
+  const storage = new MockStorage();
+  const error = new Error("foobar");
 
-//     const requestHandler = createRemoteStorageRequestHandler({
-//       storage,
-//       authorize: mockAuthorize,
-//     });
+  storage.deleteFile = () => Promise.reject(error);
 
-//     const app = createServer((req, res) => {
-//       expect(requestHandler(req, res))
-//         .rejects.toBe(error)
-//         .then(cb);
-//     });
+  const requestHandler = createRemoteStorageRequestHandler({
+    storage,
+    authorize: mockAuthorize,
+  });
 
-//     fetch(app, "/foo/bar", {
-//       method: "delete",
-//     });
-//   });
-// });
+  const app = createServer(async (req, res) => {
+    const foo = await t.throwsAsync(requestHandler(req, res));
+    t.is(foo, error);
+    t.end();
+  });
+
+  fetch(app, "/foo/bar", {
+    method: "delete",
+  });
+});
 
 test("GET folder", async t => {
   const res = await fetch(
