@@ -2,6 +2,7 @@ const test = require("ava");
 
 const fetch = require("../superfetch");
 const { createWebFingerRequestHandler } = require("./server");
+const { parseResource } = require("./WebFinger");
 
 test("sends Access-Control-Allow-Origin response header set to *", async t => {
   const requestHandler = createWebFingerRequestHandler();
@@ -41,7 +42,10 @@ test("responds with 400 if resource url parameter is not defuned", async t => {
 test("responds with 404 if getInformation is not provided", async t => {
   const requestHandler = createWebFingerRequestHandler();
   t.is(
-    (await fetch(requestHandler, "/.well-known/webfinger?resource=foo")).status,
+    (await fetch(
+      requestHandler,
+      "/.well-known/webfinger?resource=acct:foo@bar"
+    )).status,
     404
   );
 });
@@ -56,7 +60,7 @@ test("responds with 404 if getInformation returns anything else than an object",
         createWebFingerRequestHandler(async () => {
           return value;
         }),
-        "/.well-known/webfinger?resource=foo"
+        "/.well-known/webfinger?resource=acct:foo@bar"
       )).status,
       404
     );
@@ -67,10 +71,10 @@ test("responds with 200 and result of getInformation", async t => {
   const result = {
     foo: "bar",
   };
-  const resource = "foo";
+  const resource = "acct:foo@bar";
 
   async function getInformation(_resource) {
-    t.is(_resource, resource);
+    t.deepEqual(_resource, parseResource(resource));
     return result;
   }
 

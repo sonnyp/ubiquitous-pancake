@@ -1,3 +1,5 @@
+const { parseResource } = require("./WebFinger");
+
 function noop() {}
 
 function isObject(value) {
@@ -17,9 +19,13 @@ module.exports.createWebFingerRequestHandler = function createWebFingerRequestHa
       return;
     }
 
-    const url = new URL(req.url, "http://example.net");
-    const resource = url.searchParams.get("resource");
-    if (!resource) {
+    const _url = new URL(req.url, "http://example.net");
+
+    let resource;
+    try {
+      resource = parseResource(_url.searchParams.get("resource"));
+    } catch (err) {
+      // TODO onError?
       res.statusCode = 400;
       res.end();
       return;
@@ -29,6 +35,7 @@ module.exports.createWebFingerRequestHandler = function createWebFingerRequestHa
     try {
       JRD = await getInformation(resource, req, res);
     } catch (err) {
+      // TODO onError?
       res.statusCode = 500;
       res.end();
       return;

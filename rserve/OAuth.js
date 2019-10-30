@@ -1,7 +1,5 @@
 module.exports.createOAuthRequestHandler = function createOAuthRequestHandler({
-  domain,
   // authenticate,
-  prefix,
   authorize,
   grant,
 }) {

@@ -3,17 +3,15 @@
 const { createServer } = require("http");
 const {
   createRemoteStorageRequestHandler,
+  WebFingerLink,
 } = require("../RemoteStorage/server");
 const { FS } = require("../RemoteStorage/stores/FS");
-const {
-  createWebFingerRequestHandler,
-  WebFingerLink,
-} = require("../WebFinger/server");
+const { createWebFingerRequestHandler } = require("../WebFinger/server");
 const { createOAuthRequestHandler } = require("./OAuth");
 
 const domain = "localhost";
 const remoteStoragePrefix = "/storage";
-const OAuthPrefix = "/oauth";
+const OAuthPrefix = "/authorize";
 const port = 8181;
 const protocol = "http";
 const url = new URL(`${protocol}://${domain}:${port}/`);
@@ -37,12 +35,17 @@ const remoteStorage = createRemoteStorageRequestHandler({
   },
 });
 const webFinger = createWebFingerRequestHandler((resource, req, res) => {
+  if (resource instanceof URL) {
+    return null;
+  }
+
+  const { hostname, username } = resource;
+
   return {
-    subject: resource,
+    subject: `acct:${username}@${hostname}`,
     links: [
-      WebFingerLink({
-        RemoteStorage: new URL(remoteStoragePrefix, url),
-        OAuth: new URL(OAuthPrefix + "/sonny", url),
+      WebFingerLink(new URL(remoteStoragePrefix, url), {
+        authorize: new URL("/authorize", url),
       }),
     ],
   };
@@ -85,7 +88,7 @@ async function authorize(req, res) {
           ${clientId} requiring ${scope}
         </p>
 
-        <form action="/oauth" method="post">
+        <form action="/authorize" method="post">
           <p>
             <label for="username">Username:</label>
             <input type="text" name="username" required>
@@ -177,30 +180,27 @@ function requestHandler(req, res) {
   const { url } = req;
 
   if (url.startsWith(`${remoteStoragePrefix}/`)) {
-    remoteStorage(req, res).catch(err => {
+    return remoteStorage(req, res).catch(err => {
       // logger.error(err, "RemoteStorage error");
       res.statusCode = 500;
       res.end();
     });
-    return;
   }
 
   if (url.startsWith("/.well-known/webfinger")) {
-    webFinger(req, res).catch(err => {
+    return webFinger(req, res).catch(err => {
       // logger.error(err, "WebFinger error");
       res.statusCode = 500;
       res.end();
     });
-    return;
   }
 
-  if (url.startsWith(OAuthPrefix)) {
-    OAuth(req, res).catch(err => {
+  if (url.startsWith("/authorize")) {
+    return OAuth(req, res).catch(err => {
       // logger.error(err, "OAuth error");
       res.statusCode = 500;
       res.end();
     });
-    return;
   }
 
   res.statusCode = 404;

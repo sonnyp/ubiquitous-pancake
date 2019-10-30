@@ -2,7 +2,10 @@ const { createServer } = require("http");
 
 const test = require("ava");
 
-const { createRemoteStorageRequestHandler } = require("./server");
+const {
+  createRemoteStorageRequestHandler,
+  WebFingerLink,
+} = require("./server");
 const superfetch = require("../superfetch");
 const Storage = require("./Storage");
 
@@ -235,4 +238,23 @@ test("OPTIONS folder", async t => {
     "Authorization, Origin, If-Match, If-None-Match"
   );
   t.is(req.headers.get("Access-Control-Max-Age"), "600");
+});
+
+test("WebFingerLink", t => {
+  const href = "http://foobar.com/storage";
+  const authorize = "http://foobar.com/authorize";
+
+  t.deepEqual(
+    WebFingerLink(href, {
+      authorize,
+    }),
+    {
+      href,
+      rel: "http://tools.ietf.org/id/draft-dejong-remotestorage",
+      properties: {
+        "http://remotestorage.io/spec/version": "draft-dejong-remotestorage-13",
+        "http://tools.ietf.org/html/rfc6749#section-4.2": authorize,
+      },
+    }
+  );
 });
