@@ -1,203 +1,58 @@
 #!/usr/bin/env node
 
 const { createServer } = require("http");
-const {
-  createRemoteStorageRequestHandler,
-  WebFingerLink,
-} = require("../RemoteStorage/server");
-const { FS } = require("../RemoteStorage/stores/FS");
-const { createWebFingerRequestHandler } = require("../WebFinger/server");
-const { createOAuthRequestHandler } = require("./OAuth");
 
-const domain = "localhost";
-const remoteStoragePrefix = "/storage";
-const OAuthPrefix = "/authorize";
-const port = 8181;
-const protocol = "http";
-const url = new URL(`${protocol}://${domain}:${port}/`);
+const minimist = require("minimist");
+
+const { resolve } = require("path");
+const RemoteStorage = require("./RemoteStorage");
+const WebFinger = require("./WebFinger");
+const OAuth = require("./OAuth");
+const { FS } = require("../RemoteStorage/stores/FS");
+
+const argv = minimist(process.argv.slice(2));
+
+const port = argv.port || 8181;
+const host = argv.host;
+const url = new URL(argv.url || `http://localhost:${port}/`);
+// const url = new URL(`${protocol}://${domain}:${port}/`);
+
+const root = argv._[0] ? resolve(argv._[0]) : process.cwd();
 
 const storage = new FS({
-  root: "/home/sonny/",
+  root,
   hidden: false,
 });
-// TODO
-// storage.on("error", err => {
-//   pino.error(err, "remoteStorage");
-// });
-
-const tokens = new Map();
-
-const remoteStorage = createRemoteStorageRequestHandler({
+const remoteStorage = RemoteStorage({
   storage,
-  prefix: remoteStoragePrefix,
-  authorize: async (token, path) => {
-    return !!tokens.get(token);
-  },
 });
-const webFinger = createWebFingerRequestHandler((resource, req, res) => {
-  if (resource instanceof URL) {
-    return null;
-  }
-
-  const { hostname, username } = resource;
-
-  return {
-    subject: `acct:${username}@${hostname}`,
-    links: [
-      WebFingerLink(new URL(remoteStoragePrefix, url), {
-        authorize: new URL("/authorize", url),
-      }),
-    ],
-  };
+const webFinger = WebFinger({
+  url,
 });
+const oAuth = OAuth();
 
-async function authorize(req, res) {
-  const { searchParams } = new URL(req.url, `http://${domain}`);
+const server = createServer((req, res) => {
+  const { pathname, searchParams } = new URL(req.url, url);
 
-  const responseType = searchParams.get("response_type");
-  if (responseType !== "token") {
-    res.statusCode = 400;
-    res.end();
-    return;
-  }
-
-  const clientId = searchParams.get("client_id");
-  const redirectUri = searchParams.get("redirect_uri");
-  const scope = searchParams.get("scope");
-
-  if (!clientId || !redirectUri || !scope) {
-    res.statusCode = 400;
-    res.end();
-    return;
-  }
-
-  const accessDeniedURL = new URL(redirectUri);
-  accessDeniedURL.searchParams.set("error", "access_denied");
-  accessDeniedURL.hash = accessDeniedURL.search.substr(1);
-  accessDeniedURL.search = "";
-
-  res.statusCode = 200;
-  res.end(`
-    <!doctype html>
-    <html lang="en">
-      <head>
-        <meta charset="utf-8"/>
-      </head>
-      <body>
-        <p>
-          ${clientId} requiring ${scope}
-        </p>
-
-        <form action="/authorize" method="post">
-          <p>
-            <label for="username">Username:</label>
-            <input type="text" name="username" required>
-          </p>
-
-          <p>
-            <label for="password">Password:</label>
-            <input type="password" name="password" required>
-          </p>
-
-          <input type="hidden" name="client_id" value="${clientId}"/>
-          <input type="hidden" name="redirect_uri" value="${redirectUri}"/>
-          <input type="hidden" name="scope" value="${scope}"/>
-
-          <input type="submit" value="Allow"/>
-          <a href="${accessDeniedURL}"><button>Deny</button></a>
-        </form>
-      </body>
-    </html>
-  `);
-}
-async function grant(req, res) {
-  const { headers } = req;
-  if (headers["content-type"] !== "application/x-www-form-urlencoded") {
-    res.statusCode = 415;
-    res.end();
-    return;
-  }
-
-  async function readStream(req) {
-    return new Promise(resolve => {
-      let body = "";
-      req.on("data", chunk => {
-        body += chunk.toString();
-      });
-      req.on("end", () => {
-        resolve(body);
-      });
-    });
-  }
-
-  const body = await readStream(req);
-  const searchParams = new URLSearchParams(body);
-
-  const username = searchParams.get("username");
-  const password = searchParams.get("password");
-
-  if (username !== "sonny" || password !== "foobar") {
-    res.statusCode = 401;
-    res.end();
-    return;
-  }
-
-  // const clientId = searchParams.get("client_id");
-  const scope = searchParams.get("scope");
-  const redirectUri = searchParams.get("redirect_uri");
-
-  const token = Math.random()
-    .toString()
-    .substr(2);
-
-  tokens.set(token, {
-    scope,
-    username,
-  });
-
-  const redirectURL = new URL(redirectUri);
-  redirectURL.searchParams.set("access_token", token);
-  redirectURL.searchParams.set("token_type", "bearer");
-  redirectURL.hash = redirectURL.search.substr(1);
-  redirectURL.search = "";
-
-  res.statusCode = 302;
-  res.setHeader("Location", redirectURL.toString());
-  res.end();
-}
-
-const OAuth = createOAuthRequestHandler({
-  domain,
-  // authenticate,
-  authorize,
-  grant,
-  prefix: OAuthPrefix,
-});
-
-function requestHandler(req, res) {
-  // httplogger(req, res);
-
-  const { url } = req;
-
-  if (url.startsWith(`${remoteStoragePrefix}/`)) {
+  if (pathname.startsWith("/storage/")) {
     return remoteStorage(req, res).catch(err => {
-      // logger.error(err, "RemoteStorage error");
+      console.error(err);
       res.statusCode = 500;
       res.end();
     });
   }
 
-  if (url.startsWith("/.well-known/webfinger")) {
+  if (pathname === "/.well-known/webfinger") {
     return webFinger(req, res).catch(err => {
-      // logger.error(err, "WebFinger error");
+      console.error(err);
       res.statusCode = 500;
       res.end();
     });
   }
 
-  if (url.startsWith("/authorize")) {
-    return OAuth(req, res).catch(err => {
-      // logger.error(err, "OAuth error");
+  if (pathname === "/authorize") {
+    return oAuth(searchParams, req, res).catch(err => {
+      console.error(err);
       res.statusCode = 500;
       res.end();
     });
@@ -205,20 +60,12 @@ function requestHandler(req, res) {
 
   res.statusCode = 404;
   res.end();
-}
-
-const server = createServer(
-  {
-    // key: readFileSync(join(__dirname, "../../certs/server-key.pem")),
-    // cert: readFileSync(join(__dirname, "../../certs/server-cert.pem")),
-  },
-  requestHandler
-);
+});
 
 (async () => {
   await storage.load();
 
-  server.listen(port, () => {
-    console.log(`http://${domain}:${port}/`);
+  server.listen(port, host, () => {
+    console.log(`Serving ${root} at ${url}`);
   });
-})();
+})().catch(console.error);
