@@ -132,3 +132,15 @@ function createRemoteStorageRequestHandler({ storage, prefix, authorize }) {
 }
 
 module.exports.createRemoteStorageRequestHandler = createRemoteStorageRequestHandler;
+
+function WebFingerLink({ RemoteStorage, OAuth }) {
+  return {
+    href: RemoteStorage,
+    rel: "http://tools.ietf.org/id/draft-dejong-remotestorage",
+    properties: {
+      "http://remotestorage.io/spec/version": "draft-dejong-remotestorage-13",
+      "http://tools.ietf.org/html/rfc6749#section-4.2": OAuth,
+    },
+  };
+}
+module.exports.WebFingerLink = WebFingerLink;

@@ -34,7 +34,7 @@ test("setNode", t => {
   t.is(getNode(tree, "/foo"), node);
 });
 
-test("setNode creates missing intermediary", t => {
+test("setNode creates missing intermediary folders", t => {
   const tree = createTree();
 
   const node = {
