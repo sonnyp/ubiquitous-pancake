@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 
 const { createServer } = require("http");
+const { resolve } = require("path");
 
 const minimist = require("minimist");
 
-const { resolve } = require("path");
+const { listen } = require("../http/server");
 const RemoteStorage = require("./RemoteStorage");
 const WebFinger = require("./WebFinger");
 const OAuth = require("./OAuth");
@@ -21,7 +22,6 @@ const root = argv._[0] ? resolve(argv._[0]) : process.cwd();
 
 const storage = new FS({
   root,
-  hidden: false,
   mode,
 });
 const remoteStorage = RemoteStorage({
@@ -36,11 +36,13 @@ const server = createServer((req, res) => {
   const { pathname, searchParams } = new URL(req.url, url);
 
   if (pathname.startsWith("/storage/")) {
-    return remoteStorage(req, res).catch(err => {
-      console.error(err);
-      res.statusCode = 500;
-      res.end();
-    });
+    return remoteStorage(pathname.slice("/storage".length), req, res).catch(
+      err => {
+        console.error(err);
+        res.statusCode = 500;
+        res.end();
+      }
+    );
   }
 
   if (pathname === "/.well-known/webfinger") {
@@ -65,8 +67,7 @@ const server = createServer((req, res) => {
 
 (async () => {
   await storage.load();
+  await listen(server, port, host);
 
-  server.listen(port, host, () => {
-    console.log(`Serving ${root} in mode ${mode} at ${url}`);
-  });
+  console.log(`Serving ${root} in mode ${mode} at ${url}`);
 })().catch(console.error);

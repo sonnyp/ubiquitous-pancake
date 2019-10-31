@@ -1,4 +1,4 @@
-const { parse } = require("url");
+const { getBearerToken } = require("../http/server");
 
 function handleOptions(path, req, res) {
   // const requestHeaders = req.headers["access-control-request-headers"];
@@ -29,23 +29,8 @@ function handleOptions(path, req, res) {
   res.setHeader("Access-Control-Allow-Headers", allowHeaders.join(", "));
 }
 
-function getAuthorizationToken(req) {
-  const authorization = req.headers["authorization"];
-  if (!authorization || !authorization.startsWith("Bearer ")) {
-    return null;
-  }
-
-  const token = authorization.substr("Bearer ".length);
-  if (!token) {
-    return null;
-  }
-  return token || null;
-}
-
-function shouldAuthorize(req, path) {
-  const { method } = req;
-
-  if (path === "/public/" || path.startsWith("/public/")) {
+function isAuthorizationRequired(method, path) {
+  if (path.startsWith("/public/")) {
     return ["PUT", "DELETE"].includes(method);
   }
 
@@ -54,16 +39,14 @@ function shouldAuthorize(req, path) {
 
 function createRemoteStorageRequestHandler({
   storage,
-  prefix,
   authorize,
   mode = "rw",
 }) {
-  return async function remoteStorageRequestHandler(req, res) {
+  return async function remoteStorageRequestHandler(pathname, req, res) {
     res.setHeader("Access-Control-Allow-Origin", "*");
 
-    const { method, url } = req;
-    const sufix = url.substr((prefix || "").length);
-    const path = decodeURI(parse(sufix).pathname);
+    const path = decodeURIComponent(pathname);
+    const { method } = req;
 
     if (method === "OPTIONS") {
       await handleOptions(path, req, res);
@@ -71,8 +54,11 @@ function createRemoteStorageRequestHandler({
       return;
     }
 
-    if (shouldAuthorize(req, path)) {
-      const token = getAuthorizationToken(req);
+    if (
+      typeof authorize === "function" &&
+      isAuthorizationRequired(method, path)
+    ) {
+      const token = getBearerToken(req);
       if (!token) {
         res.statusCode = 401;
         res.end();
@@ -143,7 +129,6 @@ function createRemoteStorageRequestHandler({
     res.end();
   };
 }
-
 module.exports.createRemoteStorageRequestHandler = createRemoteStorageRequestHandler;
 
 function WebFingerLink(href, { authorize }) {

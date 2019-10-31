@@ -51,7 +51,6 @@ class FS extends Storage {
     const dirents = (await readdir(this.resolve(path), {
       withFileTypes: true,
     })).filter(dirent => {
-      if (!this.hidden && dirent.name.startsWith(".")) return false;
       return dirent.isDirectory() || dirent.isFile();
     });
 
@@ -78,6 +77,7 @@ class FS extends Storage {
 
   async getFile(path, req, res) {
     const name = basename(path);
+
     if (!this.hidden && name.startsWith(".")) {
       res.statusCode = 404;
       return;
@@ -87,7 +87,7 @@ class FS extends Storage {
 
     const stats = await stat(filePath);
 
-    const [, item] = await statsToEntry(stats);
+    const [, item] = await statsToEntry(stats, name);
 
     // const node = getNode(tree, path);
     // if (!node) {
