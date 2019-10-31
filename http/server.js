@@ -1,8 +1,9 @@
 const { once } = require("events");
 
-module.exports.listen = function listen(server, ...args) {
+module.exports.listen = async function listen(server, ...args) {
+  if (server.listening) return;
   server.listen(...args);
-  return once(server, "listening");
+  await once(server, "listening");
 };
 
 module.exports.getBearerToken = function getBearerToken(req) {

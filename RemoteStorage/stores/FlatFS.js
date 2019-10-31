@@ -161,7 +161,7 @@ class FlatFS extends Storage {
 
     res.statusCode = 200;
     res.setHeader("ETag", ETag);
-    // FIXME not in the spec
+    // not in the spec
     // https://github.com/remotestorage/spec/issues/173
     res.setHeader("Last-Modified", date);
   }

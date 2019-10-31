@@ -86,11 +86,7 @@ function createRemoteStorageRequestHandler({
         if (path.endsWith("/")) {
           await storage.getFolder(path, req, res);
         } else {
-          if (mode === "wo") {
-            res.statusCode = 405;
-          } else {
-            await storage.getFile(path, req, res);
-          }
+          await storage.getFile(path, req, res);
         }
         break;
       case "PUT":
@@ -104,7 +100,7 @@ function createRemoteStorageRequestHandler({
         }
         break;
       case "DELETE":
-        if (mode !== "rw") {
+        if (mode === "ro") {
           res.statusCode = 405;
         } else if (path.endsWith("/")) {
           res.statusCode = 405;
@@ -126,18 +122,21 @@ function createRemoteStorageRequestHandler({
         return;
     }
 
-    res.end();
+    if (!res.finished) {
+      res.end();
+    }
   };
 }
 module.exports.createRemoteStorageRequestHandler = createRemoteStorageRequestHandler;
 
-function WebFingerLink(href, { authorize }) {
+function WebFingerLink(href, { authorize, range = false }) {
   return {
     href,
     rel: "http://tools.ietf.org/id/draft-dejong-remotestorage",
     properties: {
       "http://remotestorage.io/spec/version": "draft-dejong-remotestorage-13",
-      "http://tools.ietf.org/html/rfc6749#section-4.2": authorize,
+      "http://tools.ietf.org/html/rfc6749#section-4.2": authorize || undefined,
+      "http://tools.ietf.org/html/rfc7233": range ? null : undefined,
     },
   };
 }

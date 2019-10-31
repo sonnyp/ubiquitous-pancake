@@ -18,7 +18,7 @@
   },
   "dependencies": {
     "crc32-stream": "^3.0.1",
-    "mime-types": "^2.1.24",
+    "send": "^0.17.1",
     "uuid": "^3.3.3"
   }
 }

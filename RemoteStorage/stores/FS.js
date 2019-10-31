@@ -1,19 +1,19 @@
 const fs = require("fs");
-const { join, basename } = require("path");
-const { promisify } = require("util");
-const stream = require("stream");
+const { join } = require("path");
+const { once } = require("events");
 
-const mime = require("mime-types");
+const send = require("send");
+const etag = require("etag");
 
 const Storage = require("../Storage");
 
-const pipeline = promisify(stream.pipeline);
+const { mime } = send;
 const { readdir, stat } = fs.promises;
 
 async function statsToEntry(stats, name) {
   const { mtime } = stats;
 
-  const ETag = `"${mtime.getTime()}"`;
+  const ETag = etag(stats);
 
   if (stats.isDirectory()) {
     return [
@@ -36,112 +36,84 @@ async function statsToEntry(stats, name) {
 }
 module.exports.statsToEntry = statsToEntry;
 
+async function directory(res, path, dotfiles) {
+  const dirents = (await readdir(path, {
+    withFileTypes: true,
+  })).filter(dirent => {
+    if (!dotfiles && dirent.name.startsWith(".")) return false;
+    return dirent.isDirectory() || dirent.isFile();
+  });
+
+  const entries = await Promise.all(
+    dirents.map(async dirent => {
+      const { name } = dirent;
+      const stats = await stat(join(path, name));
+      return statsToEntry(stats, name);
+    })
+  );
+
+  const buffer = Buffer.from(
+    JSON.stringify({
+      items: Object.fromEntries(entries),
+      "@context": "http://remotestorage.io/spec/folder-description",
+    })
+  );
+
+  res.statusCode = 200;
+  res.setHeader("ETag", etag(buffer));
+  res.setHeader("Content-Length", buffer.length);
+  res.setHeader("Content-Type", "application/ld+json; charset=UTF-8");
+  res.end(buffer);
+}
+
 class FS extends Storage {
-  constructor({ root, hidden = false }) {
+  constructor({ root, dotfiles = false }) {
     super();
+    this.sendOptions = {
+      root,
+      index: false,
+      dotfiles: dotfiles ? "allow" : "ignore",
+    };
+    this.dotfiles = dotfiles;
     this.root = root;
-    this.hidden = hidden;
   }
 
-  resolve(...args) {
-    return join(this.root, ...args);
+  async sendFile(path, req, res) {
+    // FIXME
+    // Cannot use pipeline with HEAD
+    // Error [ERR_STREAM_DESTROYED]: Cannot call pipe after a stream was destroyed
+    const sendStream = send(req, path, this.sendOptions);
+    sendStream.once("directory", (res, path) => {
+      res.statusCode = 404;
+      res.end();
+    });
+    sendStream.pipe(res);
+
+    return once(sendStream, "end");
+  }
+
+  async sendFolder(path, req, res) {
+    const sendStream = send(req, path, this.sendOptions);
+    sendStream.once("directory", directory);
+    sendStream.pipe(res);
+
+    return once(sendStream, "end");
   }
 
   async getFolder(path, req, res) {
-    const dirents = (await readdir(this.resolve(path), {
-      withFileTypes: true,
-    })).filter(dirent => {
-      return dirent.isDirectory() || dirent.isFile();
-    });
-
-    const entries = await Promise.all(
-      dirents.map(async dirent => {
-        const { name } = dirent;
-        const stats = await stat(this.resolve(path, name));
-        return statsToEntry(stats, name);
-      })
-    );
-
-    const items = Object.fromEntries(entries);
-
-    // res.setHeader("ETag", node.ETag);
-    res.setHeader("Content-Type", "application/ld+json");
-    res.statusCode = 200;
-    res.write(
-      JSON.stringify({
-        items,
-        "@context": "http://remotestorage.io/spec/folder-description",
-      })
-    );
-  }
-
-  async getFile(path, req, res) {
-    const name = basename(path);
-
-    if (!this.hidden && name.startsWith(".")) {
-      res.statusCode = 404;
-      return;
-    }
-
-    const filePath = this.resolve(path);
-
-    const stats = await stat(filePath);
-
-    const [, item] = await statsToEntry(stats, name);
-
-    // const node = getNode(tree, path);
-    // if (!node) {
-    //   res.statusCode = 404;
-    //   return;
-    // }
-
-    // if (req.headers["if-none-match"] === node.ETag) {
-    //   res.statusCode = 304;
-    //   return;
-    // }
-
-    res.statusCode = 200;
-    ["Content-Length", "Last-Modified", "ETag", "Content-Type"].forEach(
-      header => {
-        const value = item[header];
-        if (value) res.setHeader(header, value);
-      }
-    );
-
-    return pipeline(fs.createReadStream(filePath), res);
-  }
-
-  async headFile(path, req, res) {
-    const tree = await this.getTree();
-
-    const node = getNode(tree, path);
-    if (!node) {
-      res.statusCode = 404;
-      return;
-    }
-
-    res.statusCode = 200;
-    ["Content-Length", "Last-Modified", "ETag", "Content-Type"].forEach(
-      header => {
-        const value = node[header];
-        if (value) res.setHeader(header, value);
-      }
-    );
+    return this.sendFolder(path, req, res);
   }
 
   async headFolder(path, req, res) {
-    const tree = await this.getTree();
+    return this.sendFolder(path, req, res);
+  }
 
-    const node = getNode(tree, path);
-    if (!node) {
-      res.statusCode = 404;
-      return;
-    }
+  async getFile(path, req, res) {
+    return this.sendFile(path, req, res);
+  }
 
-    const { ETag } = node;
-
-    res.statusCode = 200;
-    res.setHeader("ETag", ETag);
+  async headFile(path, req, res) {
+    return this.sendFile(path, req, res);
   }
 }
 

@@ -1,73 +1,65 @@
-#!/usr/bin/env node
-
 const { createServer } = require("http");
 const { resolve } = require("path");
 
-const minimist = require("minimist");
-
-const { listen } = require("../http/server");
 const RemoteStorage = require("./RemoteStorage");
 const WebFinger = require("./WebFinger");
 const OAuth = require("./OAuth");
 const { FS } = require("../RemoteStorage/stores/FS");
 
-const argv = minimist(process.argv.slice(2));
+module.exports = function rserve(options) {
+  const port = options.port || 0;
+  const host = options.host || "localhost";
+  const mode = options.mode || "rw";
+  const username = "rserve";
+  const url = new URL(options.url || `http://${host}:${port}/`);
 
-const port = argv.port || 8181;
-const host = argv.host;
-const mode = argv.mode || "rw";
-const url = new URL(argv.url || `http://localhost:${port}/`);
+  const path = options._[0] ? resolve(options._[0]) : process.cwd();
 
-const root = argv._[0] ? resolve(argv._[0]) : process.cwd();
+  const storage = new FS({
+    root: path,
+    mode,
+  });
+  const remoteStorage = RemoteStorage({
+    storage,
+  });
+  const webFinger = WebFinger({
+    url,
+    username,
+  });
+  const oAuth = OAuth();
 
-const storage = new FS({
-  root,
-  mode,
-});
-const remoteStorage = RemoteStorage({
-  storage,
-});
-const webFinger = WebFinger({
-  url,
-});
-const oAuth = OAuth();
+  const server = createServer((req, res) => {
+    const { pathname, searchParams } = new URL(req.url, url);
 
-const server = createServer((req, res) => {
-  const { pathname, searchParams } = new URL(req.url, url);
+    function error(err) {
+      res.statusCode = err.statusCode || 500;
 
-  if (pathname.startsWith("/storage/")) {
-    return remoteStorage(pathname.slice("/storage".length), req, res).catch(
-      err => {
+      if (res.statusCode === 500) {
         console.error(err);
-        res.statusCode = 500;
+      }
+
+      if (!res.finished) {
         res.end();
       }
-    );
-  }
+    }
 
-  if (pathname === "/.well-known/webfinger") {
-    return webFinger(req, res).catch(err => {
-      console.error(err);
-      res.statusCode = 500;
-      res.end();
-    });
-  }
+    if (pathname.startsWith("/storage/")) {
+      return remoteStorage(pathname.slice("/storage".length), req, res).catch(
+        error
+      );
+    }
 
-  if (pathname === "/authorize") {
-    return oAuth(searchParams, req, res).catch(err => {
-      console.error(err);
-      res.statusCode = 500;
-      res.end();
-    });
-  }
+    if (pathname === "/.well-known/webfinger") {
+      return webFinger(req, res).catch(error);
+    }
 
-  res.statusCode = 404;
-  res.end();
-});
+    if (pathname === "/authorize") {
+      return oAuth(searchParams, req, res).catch(error);
+    }
 
-(async () => {
-  await storage.load();
-  await listen(server, port, host);
+    res.statusCode = 404;
+    res.end();
+  });
 
-  console.log(`Serving ${root} in mode ${mode} at ${url}`);
-})().catch(console.error);
+  return { server, storage, username, url, host, port, mode, path };
+};

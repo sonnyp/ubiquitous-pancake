@@ -1,0 +1,37 @@
+#!/usr/bin/env node
+
+const minimist = require("minimist");
+const rserve = require("./rserve.js");
+const { listen } = require("../http/server");
+
+const { storage, server, ...params } = rserve(minimist(process.argv.slice(2)));
+
+(async () => {
+  const { port, host, url, username } = params;
+
+  await storage.load();
+  await listen(server, port, host);
+  url.port = server.address().port;
+
+  console.log(`${username}@${url.host}`);
+
+  return {
+    server,
+    storage,
+  };
+})().catch(console.error);
+
+async function handleExit() {
+  server.close();
+  try {
+    await storage.unload();
+  } catch (err) {
+    console.error(err);
+    return process.exit(1);
+  }
+  process.exit(0);
+}
+
+["SIGINT", "SIGTERM"].forEach(signal => {
+  process.once(signal, handleExit);
+});
