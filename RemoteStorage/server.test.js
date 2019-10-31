@@ -11,18 +11,6 @@ const Storage = require("./Storage");
 
 class MockStorage extends Storage {}
 
-async function fetch(app, path, options = {}) {
-  if (!options.headers) {
-    options.headers = {};
-  }
-
-  if (!options.headers["Authorization"]) {
-    options.headers["Authorization"] = "Bearer foobar";
-  }
-
-  return superfetch(app, path, options);
-}
-
 async function mockAuthorize(token, path) {
   return true;
 }
@@ -54,13 +42,34 @@ test("responds with 401 if Auhtorization header is invalid", async t => {
   t.is(res.status, 401);
 });
 
+test("responds with 403 if token is not authorized", async t => {
+  const res = await superfetch(
+    createRemoteStorageRequestHandler({
+      storage: new MockStorage(),
+      authorize: async () => false,
+    }),
+    "/",
+    {
+      headers: {
+        Authorization: "Bearer foobar",
+      },
+    }
+  );
+  t.is(res.status, 403);
+});
+
 test("sets Access-Control-Allow-Origin response header set to *", async t => {
-  const res = await fetch(
+  const res = await superfetch(
     createRemoteStorageRequestHandler({
       storage: new MockStorage(),
       authorize: mockAuthorize,
     }),
-    "/"
+    "/",
+    {
+      headers: {
+        Authorization: "Bearer foobar",
+      },
+    }
   );
   t.is(res.headers.get("Access-Control-Allow-Origin"), "*");
 });
@@ -84,19 +93,27 @@ test.cb("rejects if an operation throws or rejects", t => {
     t.end();
   });
 
-  fetch(app, "/foo/bar", {
+  superfetch(app, "/foo/bar", {
     method: "delete",
+    headers: {
+      Authorization: "Bearer foobar",
+    },
   });
 });
 
 test("GET folder", async t => {
-  const res = await fetch(
+  const res = await superfetch(
     createRemoteStorageRequestHandler({
       storage: new MockStorage(),
       authorize: mockAuthorize,
     }),
     "/",
-    { method: "GET" }
+    {
+      method: "GET",
+      headers: {
+        Authorization: "Bearer foobar",
+      },
+    }
   );
   t.is(
     res.headers.get("Access-Control-Expose-Headers"),
@@ -106,13 +123,18 @@ test("GET folder", async t => {
 });
 
 test("GET file", async t => {
-  const res = await fetch(
+  const res = await superfetch(
     createRemoteStorageRequestHandler({
       storage: new MockStorage(),
       authorize: mockAuthorize,
     }),
     "/foo",
-    { method: "GET" }
+    {
+      method: "GET",
+      headers: {
+        Authorization: "Bearer foobar",
+      },
+    }
   );
   t.is(
     res.headers.get("Access-Control-Expose-Headers"),
@@ -122,7 +144,7 @@ test("GET file", async t => {
 });
 
 test("PUT folder", async t => {
-  const res = await fetch(
+  const res = await superfetch(
     createRemoteStorageRequestHandler({
       storage: new MockStorage(),
       authorize: mockAuthorize,
@@ -130,38 +152,51 @@ test("PUT folder", async t => {
     "/foo/",
     {
       method: "PUT",
+      headers: {
+        Authorization: "Bearer foobar",
+      },
     }
   );
   t.is(res.status, 405);
 });
 
 test("PUT file", async t => {
-  const res = await fetch(
+  const res = await superfetch(
     createRemoteStorageRequestHandler({
       storage: new MockStorage(),
       authorize: mockAuthorize,
     }),
     "/foo",
-    { method: "PUT" }
+    {
+      method: "PUT",
+      headers: {
+        Authorization: "Bearer foobar",
+      },
+    }
   );
   t.is(res.headers.get("Access-Control-Expose-Headers"), "ETag");
 });
 
 test("PUT file - mode=ro", async t => {
-  const res = await fetch(
+  const res = await superfetch(
     createRemoteStorageRequestHandler({
       storage: new MockStorage(),
       authorize: mockAuthorize,
       mode: "ro",
     }),
     "/foo",
-    { method: "PUT" }
+    {
+      method: "PUT",
+      headers: {
+        Authorization: "Bearer foobar",
+      },
+    }
   );
   t.is(res.status, 405);
 });
 
 test("DELETE folder", async t => {
-  const res = await fetch(
+  const res = await superfetch(
     createRemoteStorageRequestHandler({
       storage: new MockStorage(),
       authorize: mockAuthorize,
@@ -169,44 +204,62 @@ test("DELETE folder", async t => {
     "/foo/",
     {
       method: "DELETE",
+      headers: {
+        Authorization: "Bearer foobar",
+      },
     }
   );
   t.is(res.status, 405);
 });
 
 test("DELETE file", async t => {
-  const res = await fetch(
+  const res = await superfetch(
     createRemoteStorageRequestHandler({
       storage: new MockStorage(),
       authorize: mockAuthorize,
     }),
     "/foo",
-    { method: "DELETE" }
+    {
+      method: "DELETE",
+      headers: {
+        Authorization: "Bearer foobar",
+      },
+    }
   );
   t.is(res.headers.get("Access-Control-Expose-Headers"), "ETag");
 });
 
 test("DELETE file - ro", async t => {
-  const res = await fetch(
+  const res = await superfetch(
     createRemoteStorageRequestHandler({
       storage: new MockStorage(),
       authorize: mockAuthorize,
       mode: "ro",
     }),
     "/foo",
-    { method: "DELETE" }
+    {
+      method: "DELETE",
+      headers: {
+        Authorization: "Bearer foobar",
+      },
+    }
   );
   t.is(res.status, 405);
 });
 
 test("HEAD folder", async t => {
-  const res = await fetch(
+  const res = await superfetch(
     createRemoteStorageRequestHandler({
       storage: new MockStorage(),
       authorize: mockAuthorize,
     }),
     "/",
-    { method: "HEAD" }
+    {
+      method: "HEAD",
+      headers: {
+        Authorization: "Bearer foobar",
+      },
+    }
   );
   t.is(
     res.headers.get("Access-Control-Expose-Headers"),
@@ -215,13 +268,18 @@ test("HEAD folder", async t => {
 });
 
 test("HEAD file", async t => {
-  const res = await fetch(
+  const res = await superfetch(
     createRemoteStorageRequestHandler({
       storage: new MockStorage(),
       authorize: mockAuthorize,
     }),
     "/foo",
-    { method: "head" }
+    {
+      method: "head",
+      headers: {
+        Authorization: "Bearer foobar",
+      },
+    }
   );
   t.is(
     res.headers.get("Access-Control-Expose-Headers"),
@@ -230,13 +288,18 @@ test("HEAD file", async t => {
 });
 
 test("OPTIONS file", async t => {
-  const req = await fetch(
+  const req = await superfetch(
     createRemoteStorageRequestHandler({
       storage: new MockStorage(),
       authorize: mockAuthorize,
     }),
     "/foo",
-    { method: "OPTIONS" }
+    {
+      method: "OPTIONS",
+      headers: {
+        Authorization: "Bearer foobar",
+      },
+    }
   );
   t.is(
     req.headers.get("Access-Control-Allow-Methods"),
@@ -250,13 +313,18 @@ test("OPTIONS file", async t => {
 });
 
 test("OPTIONS folder", async t => {
-  const req = await fetch(
+  const req = await superfetch(
     createRemoteStorageRequestHandler({
       storage: new MockStorage(),
       authorize: mockAuthorize,
     }),
     "/foo/bar/",
-    { method: "OPTIONS" }
+    {
+      method: "OPTIONS",
+      headers: {
+        Authorization: "Bearer foobar",
+      },
+    }
   );
   t.is(req.headers.get("Access-Control-Allow-Methods"), "OPTIONS, HEAD, GET");
   t.is(
@@ -273,6 +341,7 @@ test("WebFingerLink", t => {
   t.deepEqual(
     WebFingerLink(href, {
       authorize,
+      range: true,
     }),
     {
       href,
@@ -280,7 +349,16 @@ test("WebFingerLink", t => {
       properties: {
         "http://remotestorage.io/spec/version": "draft-dejong-remotestorage-13",
         "http://tools.ietf.org/html/rfc6749#section-4.2": authorize,
+        "http://tools.ietf.org/html/rfc7233": null,
       },
     }
   );
+
+  t.deepEqual(WebFingerLink(href, {}), {
+    href,
+    rel: "http://tools.ietf.org/id/draft-dejong-remotestorage",
+    properties: {
+      "http://remotestorage.io/spec/version": "draft-dejong-remotestorage-13",
+    },
+  });
 });

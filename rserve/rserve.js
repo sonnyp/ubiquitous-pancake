@@ -6,6 +6,12 @@ const WebFinger = require("./WebFinger");
 const OAuth = require("./OAuth");
 const { FS } = require("../RemoteStorage/stores/FS");
 
+function logger(req, res) {
+  res.once("finish", () => {
+    console.log(req.method, req.url, "-", res.statusCode, res.statusMessage);
+  });
+}
+
 module.exports = function rserve(options) {
   const port = options.port || 0;
   const host = options.host || "localhost";
@@ -29,6 +35,8 @@ module.exports = function rserve(options) {
   const oAuth = OAuth();
 
   const server = createServer((req, res) => {
+    logger(req, res);
+
     const { pathname, searchParams } = new URL(req.url, url);
 
     function error(err) {
@@ -44,7 +52,7 @@ module.exports = function rserve(options) {
     }
 
     if (pathname.startsWith("/storage/")) {
-      return remoteStorage(pathname.slice("/storage".length), req, res).catch(
+      return remoteStorage(req, res, pathname.slice("/storage".length)).catch(
         error
       );
     }
@@ -54,7 +62,7 @@ module.exports = function rserve(options) {
     }
 
     if (pathname === "/authorize") {
-      return oAuth(searchParams, req, res).catch(error);
+      return oAuth(req, res, searchParams).catch(error);
     }
 
     res.statusCode = 404;

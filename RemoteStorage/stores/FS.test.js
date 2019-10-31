@@ -2,6 +2,7 @@ const fs = require("fs");
 const test = require("ava");
 const { statsToEntry } = require("./FS");
 const { basename } = require("path");
+const etag = require("etag");
 
 const { stat } = fs.promises;
 
@@ -12,7 +13,7 @@ test("statsToEntry for file", async t => {
     {
       "Content-Length": stats.size,
       "Content-Type": "application/javascript",
-      ETag: `"${stats.mtime.getTime()}"`,
+      ETag: etag(stats),
       "Last-Modified": stats.mtime.toUTCString(),
     },
   ]);
@@ -23,7 +24,7 @@ test("statsToEntry for dir", async t => {
   t.deepEqual(await statsToEntry(stats, basename(__dirname)), [
     "stores/",
     {
-      ETag: `"${stats.mtime.getTime()}"`,
+      ETag: etag(stats),
     },
   ]);
 });

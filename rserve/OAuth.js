@@ -1,5 +1,5 @@
 module.exports = function OAuth() {
-  return async function authorize(searchParams, req, res) {
+  return async function authorize(req, res, searchParams) {
     const redirectUri = searchParams.get("redirect_uri");
     const token = Math.random()
       .toString()
