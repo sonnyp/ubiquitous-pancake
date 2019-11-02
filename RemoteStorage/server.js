@@ -59,13 +59,28 @@ async function isDenied(req, res, path, authorize) {
   return false;
 }
 
+function isInsane(req, res, path, dotfiles) {
+  if (dotfiles) return false;
+  if (!path.includes("/.")) return false;
+  if (req.method === "PUT") {
+    res.statusCode = 409;
+  } else {
+    res.statusCode = 404;
+  }
+  res.end();
+  return true;
+}
+
 function createRemoteStorageRequestHandler({
   storage,
   authorize,
   mode = "rw",
+  dotfiles = false,
 }) {
-  return async function remoteStorageRequestHandler(req, res, path = req.url) {
+  return async function remoteStorageRequestHandler(req, res, path) {
     res.setHeader("Access-Control-Allow-Origin", "*");
+
+    path = new URL(path || req.url, "http://example.net").pathname;
 
     const { method } = req;
 
@@ -76,6 +91,10 @@ function createRemoteStorageRequestHandler({
     }
 
     if (await isDenied(req, res, path, authorize)) {
+      return;
+    }
+
+    if (isInsane(req, res, path, dotfiles)) {
       return;
     }
 

@@ -1,6 +1,8 @@
 const fs = require("fs");
-const { join } = require("path");
+const { join, dirname } = require("path");
 const { once } = require("events");
+const stream = require("stream");
+const { promisify } = require("util");
 
 const send = require("send");
 const etag = require("etag");
@@ -8,7 +10,8 @@ const etag = require("etag");
 const Storage = require("../Storage");
 
 const { mime } = send;
-const { readdir, stat } = fs.promises;
+const { readdir, stat, unlink, mkdir } = fs.promises;
+const pipeline = promisify(stream.pipeline);
 
 async function statsToEntry(stats, name) {
   const { mtime } = stats;
@@ -114,6 +117,38 @@ class FS extends Storage {
 
   async headFile(path, req, res) {
     return this.sendFile(path, req, res);
+  }
+
+  async putFile(path, req, res) {
+    path = join(this.root, path);
+
+    await mkdir(dirname(path));
+    await pipeline(
+      req,
+      fs.createWriteStream(path, {
+        flags: "wx",
+      })
+    );
+    const stats = await stat(path);
+    res.statusCode(201);
+    res.setHeader("ETag", etag(stats));
+    res.setHeader("Last-Modified", stats.mtime.toUTCString());
+  }
+
+  async deleteFile(path, req, res) {
+    path = join(this.root, path);
+    // FIXME
+    // remove empty folders ?
+    try {
+      await unlink(path);
+    } catch (err) {
+      if (err.code === "ENOENT") {
+        res.statusCode = 404;
+        return;
+      }
+      throw err;
+    }
+    res.statusCode = 200;
   }
 }
 

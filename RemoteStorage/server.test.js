@@ -11,6 +11,33 @@ const Storage = require("./Storage");
 
 class MockStorage extends Storage {}
 
+class SuccessMockStorage extends Storage {
+  getFolder(path, req, res) {
+    res.statusCode = 200;
+    res.end();
+  }
+  getFile(path, req, res) {
+    res.statusCode = 200;
+    res.end();
+  }
+  putFile(path, req, res) {
+    res.statusCode = 201;
+    res.end();
+  }
+  deleteFile(path, req, res) {
+    res.statusCode = 200;
+    res.end();
+  }
+  headFolder(path, req, res) {
+    res.statusCode = 200;
+    res.end();
+  }
+  headFile(path, req, res) {
+    res.statusCode = 200;
+    res.end();
+  }
+}
+
 async function mockAuthorize(token, path) {
   return true;
 }
@@ -332,6 +359,36 @@ test("OPTIONS folder", async t => {
     "Authorization, Origin, If-Match, If-None-Match"
   );
   t.is(req.headers.get("Access-Control-Max-Age"), "600");
+});
+
+test("dotfiles", async t => {
+  const storage = new SuccessMockStorage();
+  const authorize = mockAuthorize;
+  const app = createRemoteStorageRequestHandler({
+    storage,
+    authorize,
+  });
+  const headers = { Authorization: "Bearer foobar" };
+
+  const tests = [
+    ["/foo/.bar"],
+    ["/foo/.bar/foobar"],
+    ["/foo/.bar/"],
+    ["/foo/.bar/foobar/"],
+  ];
+  const methods = ["GET", "HEAD", "DELETE", "PUT"];
+
+  for await (const method of methods) {
+    for await (const [path] of tests) {
+      t.is(
+        (await superfetch(app, path, {
+          method,
+          headers,
+        })).status,
+        method === "PUT" ? 409 : 404
+      );
+    }
+  }
 });
 
 test("WebFingerLink", t => {
