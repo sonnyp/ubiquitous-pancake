@@ -27,7 +27,7 @@ test("responds with 405 if method is not GET", async t => {
   t.is(await getStatus("TRACE"), 405);
 });
 
-test("responds with 400 if resource url parameter is not defuned", async t => {
+test("responds with 400 if resource url parameter is not defined", async t => {
   const requestHandler = createWebFingerRequestHandler();
   async function getStatus(path) {
     return (await fetch(requestHandler, path)).status;

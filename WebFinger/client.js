@@ -1,4 +1,4 @@
-const HTTPError = require("../HTTPError");
+const HTTPError = require("../http/error");
 const { parseResource } = require("./WebFinger");
 
 async function lookup(resource, options = {}) {

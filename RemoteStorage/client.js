@@ -1,4 +1,4 @@
-const HTTPError = require("../HTTPError");
+const HTTPError = require("../http/error");
 
 function createNode(headers) {
   const node = Object.create(null);

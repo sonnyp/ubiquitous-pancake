@@ -1,4 +1,5 @@
 const { once } = require("events");
+const tls = require("tls");
 
 module.exports.listen = async function listen(server, ...args) {
   if (server.listening) return;
@@ -17,4 +18,17 @@ module.exports.getBearerToken = function getBearerToken(req) {
     return null;
   }
   return token || null;
+};
+
+function isSecureServer(server) {
+  return server instanceof tls.Server;
+}
+module.exports.isSecureServer = this.isSecureServer;
+
+module.exports.serverURL = function(server) {
+  const { port, address, family } = server.address();
+  const hostname = family === "IPv6" ? `[${address}]` : address;
+
+  const protocol = isSecureServer(server) ? "https" : "http";
+  return new URL(protocol + "://" + hostname + ":" + port);
 };
